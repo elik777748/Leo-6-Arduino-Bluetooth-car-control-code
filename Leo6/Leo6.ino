@@ -7,7 +7,7 @@ CRGB leds[8];
 int speedrn = 150;
 bool backword_led = false;
 char dataBT;
-char lastDataBTr;
+char lastDataBT;
 int color = 0;
 int prevColorIndex = -1;
 int servo_defalt = 90;
