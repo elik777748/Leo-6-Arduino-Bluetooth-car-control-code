@@ -1,14 +1,39 @@
+
+
+
+// code made a elik7777
+// company R0B0C0DE
+
+
+//---------------Setting LEO 6---------------------
+                                                //-
+//number                                        //-
+bool LeoNumberOn = true;                        //-
+unsigned int LeoNumber = 1;                     //-
+                                                //-
+//speed default                                 //-
+unsigned int speed = 150;  //not: speeed < 150  //-
+                                                //-
+//--------------------------------------------------
+
+
 #include <Servo.h>
 #include <FastLED.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-LiquidCrystal_I2C lcd(0x27, 16, 2); 
+#include "melody.h"
+#include "SevenSegmentDisplay.h"
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 CRGB leds[8];
-int speedrn = 150;
+unsigned long lastChangeTime = 0;
+int lastPotValue = 0;
+bool on_six_seven = true;
+bool cleared = false;
+int buzzerPin = 31;
+int speedrn = speed;
 bool backword_led = false;
 char dataBT;
 char lastDataBT;
-int color = 0;
 int prevColorIndex = -1;
 int servo_defalt = 90;
 bool zoomer;
@@ -16,6 +41,7 @@ bool forword_led;
 unsigned long avariaTimer = 0;
 bool avariaState = false;
 bool avaria;
+unsigned int color = 0;
 const unsigned long avariaInterval = 1000;
 bool six_seven = false;
 bool lastButtonState = LOW;
@@ -23,7 +49,6 @@ unsigned long prevMillis = 0;
 const int multiplexInterval = 5;
 bool showTens = true;
 Servo servo;
-int speed = 150;
 int A = 32;
 int B = 33;
 int C = 34;
@@ -31,20 +56,21 @@ int D = 35;
 int E = 36;
 int F = 37;
 int G = 38;
+int H = 39;
 int TENS = 41;
 int ONES = 40;
 CRGB colors[11] = {
   CRGB::Black,
-  CRGB::Red,  
-  CRGB::Green, 
-  CRGB::Blue,    
-  CRGB::Yellow,  
-  CRGB::Cyan,  
-  CRGB::Magenta,  
+  CRGB::Red,
+  CRGB::Green,
+  CRGB::Blue,
+  CRGB::Yellow,
+  CRGB::Cyan,
+  CRGB::Magenta,
   CRGB::Orange,
-  CRGB::Purple, 
-  CRGB::Pink, 
-  CRGB::White  
+  CRGB::Purple,
+  CRGB::Pink,
+  CRGB::White
 };
 #define NUM_LEDS 8
 void forword() {
@@ -159,7 +185,7 @@ void setup() {
   pinMode(9, OUTPUT);
   pinMode(26, OUTPUT);
   pinMode(27, OUTPUT);
-  pinMode(31, OUTPUT);
+  pinMode(buzzerPin, OUTPUT);
   pinMode(16, INPUT);
   pinMode(17, INPUT);
   servo.attach(11);
@@ -176,29 +202,58 @@ void setup() {
   FastLED.show();
   pinMode(TENS, OUTPUT);
   pinMode(ONES, OUTPUT);
-  
-  Wire.begin();     
-  lcd.begin(16, 2);    
-  lcd.backlight();   
-    lcd.setCursor(4, 0);
+  clearDisplaySegment();
+  Wire.begin();
+  lcd.begin(16, 2);
+  lcd.backlight();
+  lcd.setCursor(4, 0);
   lcd.print("R0B0C0DE");
-
+  if (LeoNumberOn) {
+    lcd.setCursor(5, 1);
+    lcd.print("Leo");
+    lcd.setCursor(9, 1);
+    lcd.print(LeoNumber);
+  }
 }
 void loop() {
+  updateSong();
+  int colorIndex = map(analogRead(3), 0, 1023, 0, 10);
+  int sounds = map(analogRead(2), 0, 1000, 0, 5);
+  if (sounds != lastPotValue) {
+    lastPotValue = sounds;
+    lastChangeTime = millis();
+    cleared = false;
 
- 
-  Serial.println(analogRead(1));
+    displayDigitSegment(sounds, true);
+    on_six_seven = false;
+  }
+
+  if (!cleared && millis() - lastChangeTime >= 3000) {
+    clearDisplaySegment();
+    cleared = true;
+    on_six_seven = true;
+  }
+
+
+
+
+  if (digitalRead(17) == 1) {
+    if (sounds == 0) {
+      stopAllSounds();
+    } else {
+      startSong(sounds - 1);
+    }
+  }
+
+  Serial.println(sounds);
   if (digitalRead(17) == 1) {
     speed = map(analogRead(0), 0, 1023, 0, 255);
     speedrn = speed;
     servo.write(map(analogRead(1), 0, 1023, 20, 160));
   }
- int colorIndex = map(analogRead(3), 0, 1023, 0, 10);
-
-  // Виконуємо switch тільки якщо значення змінилося
   if (colorIndex != prevColorIndex) {
 
-    prevColorIndex = colorIndex; // оновлюємо
+    prevColorIndex = colorIndex;
 
     switch (colorIndex) {
       case 0:
@@ -265,45 +320,22 @@ void loop() {
     six_seven = !six_seven;
   }
   lastButtonState = currentButtonState;
-  if (six_seven) {
-    unsigned long currentMillis = millis();
-    if (currentMillis - prevMillis >= multiplexInterval) {
-      prevMillis = currentMillis;
-      showTens = !showTens;
-      if (showTens) {
-        digitalWrite(TENS, HIGH);
-        digitalWrite(ONES, LOW);
-        digitalWrite(A, HIGH);
-        digitalWrite(B, LOW);
-        digitalWrite(C, HIGH);
-        digitalWrite(D, HIGH);
-        digitalWrite(E, HIGH);
-        digitalWrite(F, HIGH);
-        digitalWrite(G, HIGH);
-      } else {
-        digitalWrite(TENS, LOW);
-        digitalWrite(ONES, HIGH);
-        digitalWrite(A, HIGH);
-        digitalWrite(B, HIGH);
-        digitalWrite(C, HIGH);
-        digitalWrite(D, LOW);
-        digitalWrite(E, LOW);
-        digitalWrite(F, LOW);
-        digitalWrite(G, LOW);
+  if (on_six_seven) {
+    if (six_seven) {
+      unsigned long currentMillis = millis();
+      if (currentMillis - prevMillis >= multiplexInterval) {
+        prevMillis = currentMillis;
+        showTens = !showTens;
+        if (showTens) {
+          displayDigitSegment(6, false);
+        } else {
+          displayDigitSegment(7, true);
+        }
       }
+    } else {
+      clearDisplaySegment();
     }
-  } else {
-    digitalWrite(TENS, LOW);
-    digitalWrite(ONES, LOW);
-    digitalWrite(A, LOW);
-    digitalWrite(B, LOW);
-    digitalWrite(C, LOW);
-    digitalWrite(D, LOW);
-    digitalWrite(E, LOW);
-    digitalWrite(F, LOW);
-    digitalWrite(G, LOW);
   }
-
   if (avaria) {
 
     unsigned long now = millis();
