@@ -6,14 +6,14 @@
 
 
 //---------------Setting LEO 6---------------------
-                                                //-
-//number                                        //-
-bool LeoNumberOn = true;                        //-
-unsigned int LeoNumber = 1;                     //-
-                                                //-
-//speed default                                 //-
-unsigned int speed = 150;  //not: speeed < 150  //-
-                                                //-
+
+//number
+bool LeoNumberOn = true;
+unsigned int LeoNumber = 1;
+
+//speed default
+unsigned int speed = 150;  //not: speeed < 150
+
 //--------------------------------------------------
 
 
@@ -21,6 +21,7 @@ unsigned int speed = 150;  //not: speeed < 150  //-
 #include <FastLED.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include "Sonar.h"
 #include "melody.h"
 #include "SevenSegmentDisplay.h"
 LiquidCrystal_I2C lcd(0x27, 16, 2);
@@ -38,7 +39,12 @@ int prevColorIndex = -1;
 int servo_defalt = 90;
 bool zoomer;
 bool forword_led;
+bool drawToLSD = false;
 unsigned long avariaTimer = 0;
+bool saveWallState;
+bool sonareState;
+bool AlgoritmBlackLineState;
+bool saveWall = false;
 bool avariaState = false;
 bool avaria;
 unsigned int color = 0;
@@ -46,9 +52,16 @@ const unsigned long avariaInterval = 1000;
 bool six_seven = false;
 bool lastButtonState = LOW;
 unsigned long prevMillis = 0;
+bool StateState = false;
 const int multiplexInterval = 5;
+unsigned long startTime = 0;
+bool isBacking = false;
 bool showTens = true;
+bool sonare = false;
+bool AlgoritmBlackLine = false;
 Servo servo;
+int trigPin = 12;
+int echoPin = 13;
 int A = 32;
 int B = 33;
 int C = 34;
@@ -72,6 +85,10 @@ CRGB colors[11] = {
   CRGB::Pink,
   CRGB::White
 };
+
+int out[] = { A, B, C, D, E, F, G, H, 6, 7, 8, 9, 26, 27, 28, 29, 30, buzzerPin, TENS, ONES };
+int in[] = { 16, 17 };
+
 #define NUM_LEDS 8
 void forword() {
   digitalWrite(6, 1);
@@ -176,32 +193,21 @@ void left(bool a) {
   digitalWrite(9, c);
   analogWrite(5, speed);
   analogWrite(10, speed);
-  servo.write(73);
+  servo.write(53);
 }
 void setup() {
-  pinMode(6, OUTPUT);
-  pinMode(7, OUTPUT);
-  pinMode(8, OUTPUT);
-  pinMode(9, OUTPUT);
-  pinMode(26, OUTPUT);
-  pinMode(27, OUTPUT);
-  pinMode(buzzerPin, OUTPUT);
-  pinMode(16, INPUT);
-  pinMode(17, INPUT);
   servo.attach(11);
   servo.write(servo_defalt);
   Serial.begin(9600);
   Serial3.begin(9600);
   FastLED.addLeds<WS2812, 42, GRB>(leds, NUM_LEDS);
   FastLED.setBrightness(100);
-  int segments[] = { A, B, C, D, E, F, G };
-  for (int i = 0; i < 7; i++) pinMode(segments[i], OUTPUT);
+  for (int i = 0; i < sizeof(out) / sizeof(out[0]); i++) pinMode(out[i], OUTPUT);
+  for (int i = 0; i < sizeof(in) / sizeof(in[0]); i++) pinMode(in[i], INPUT);
   for (int i = 0; i < NUM_LEDS; i++) {
     leds[i] = backword_led ? CRGB::Red : CRGB::Black;
   }
   FastLED.show();
-  pinMode(TENS, OUTPUT);
-  pinMode(ONES, OUTPUT);
   clearDisplaySegment();
   Wire.begin();
   lcd.begin(16, 2);
@@ -214,17 +220,20 @@ void setup() {
     lcd.setCursor(9, 1);
     lcd.print(LeoNumber);
   }
+  initSonar();
 }
 void loop() {
+  unsigned int distance = getDistance();
+  //Serial.println(distance);
   updateSong();
   int colorIndex = map(analogRead(3), 0, 1023, 0, 10);
-  int sounds = map(analogRead(2), 0, 1000, 0, 5);
-  if (sounds != lastPotValue) {
-    lastPotValue = sounds;
+  int potensometrA2 = map(analogRead(2), 0, 1000, 0, 5);
+  if (potensometrA2 != lastPotValue) {
+    lastPotValue = potensometrA2;
     lastChangeTime = millis();
     cleared = false;
 
-    displayDigitSegment(sounds, true);
+    displayDigitSegment(potensometrA2, true);
     on_six_seven = false;
   }
 
@@ -234,18 +243,135 @@ void loop() {
     on_six_seven = true;
   }
 
-
-
-
-  if (digitalRead(17) == 1) {
-    if (sounds == 0) {
-      stopAllSounds();
-    } else {
-      startSong(sounds - 1);
+  if (analogRead(7) >= 500) {
+    switch (potensometrA2) {
+      case 0:
+        sonare = false;
+        AlgoritmBlackLine = false;
+        saveWall = false;
+        drawToLSD = false;
+        displayDigitSegment(potensometrA2, true);
+        break;
+      case 1:
+        sonare = true;
+        AlgoritmBlackLine = false;
+        saveWall = false;
+        drawToLSD = false;
+        displayDigitSegment(potensometrA2, true);
+        break;
+      case 2:
+        sonare = false;
+        AlgoritmBlackLine = true;
+        saveWall = false;
+        drawToLSD = false;
+        displayDigitSegment(potensometrA2, true);
+        break;
+      case 3:
+        sonare = false;
+        AlgoritmBlackLine = false;
+        saveWall = true;
+        drawToLSD = false;
+        displayDigitSegment(potensometrA2, true);
+        break;
+      case 4:
+        sonare = false;
+        AlgoritmBlackLine = false;
+        saveWall = false;
+        drawToLSD = true;
+        displayDigitSegment(potensometrA2, true);
+        break;
+      case 5:
+        sonare = false;
+        AlgoritmBlackLine = false;
+        saveWall = false;
+        drawToLSD = false;
+        displayDigitSegment(potensometrA2, true);
+        break;
     }
   }
 
-  Serial.println(sounds);
+  if (saveWall) {
+    if (distance < 25 && distance != 0 && !isBacking) {
+      isBacking = true;
+      startTime = millis();
+    }
+    if (isBacking) {
+      backword();
+      if (millis() - startTime >= 300) {
+        stop();
+        isBacking = false;
+      }
+      speed = speedrn;
+      return;
+    }
+  }
+
+  if (AlgoritmBlackLine) {
+    speed = 80;
+    if (distance < 30 && distance != 0 && !isBacking) {
+      isBacking = true;
+      startTime = millis();
+    }
+    if (isBacking) {
+      backword();
+      if (millis() - startTime >= 1500) {
+        stop();
+        isBacking = false;
+      }
+      return;
+    }
+    int s4 = analogRead(4);
+    int s5 = analogRead(5);
+    // Serial.print("S4: ");
+    // Serial.print(s4);
+    // Serial.print(" S5: ");
+    // Serial.println(s5);
+    int sensor = 400;
+    if (s4 > sensor && s5 <= sensor) {
+      left(true);
+      delay(100);
+    } else if (s5 > sensor && s4 <= sensor) {
+      rigth(true);
+      delay(100);
+    } else {
+      forword();
+    }
+    delay(100);
+  } else {
+    speed = speedrn;
+    stop();
+  }
+if (drawToLSD){
+
+
+}
+
+  if (sonare) {
+    if (distance <= 200 && distance > 60) {
+      digitalWrite(28, 0);
+      digitalWrite(29, 0);
+      digitalWrite(30, 1);
+    } else if (distance <= 60 && distance > 20) {
+      digitalWrite(28, 0);
+      digitalWrite(29, 1);
+      digitalWrite(30, 1);
+    } else if (distance <= 20 && distance >= 0) {
+      digitalWrite(28, 1);
+      digitalWrite(29, 1);
+      digitalWrite(30, 1);
+    }
+  } else {
+    digitalWrite(28, 0);
+    digitalWrite(29, 0);
+    digitalWrite(30, 0);
+  }
+  if (digitalRead(17) == 1) {
+    if (potensometrA2 == 0) {
+      stopAllSounds();
+    } else {
+      startSong(potensometrA2 - 1);
+    }
+  }
   if (digitalRead(17) == 1) {
     speed = map(analogRead(0), 0, 1023, 0, 255);
     speedrn = speed;
@@ -337,6 +463,16 @@ void loop() {
     }
   }
   if (avaria) {
+    if (!StateState) {
+      StateState = true;
+      sonareState = sonare;
+      AlgoritmBlackLineState = AlgoritmBlackLine;
+      saveWallState = saveWall;
+
+      sonare = false;
+      AlgoritmBlackLine = false;
+      saveWall = false;
+    }
 
     unsigned long now = millis();
 
@@ -372,8 +508,14 @@ void loop() {
     }
 
   } else {
-
+    if (StateState) {
+      sonare = sonareState;
+      AlgoritmBlackLine = AlgoritmBlackLineState;
+      saveWall = saveWallState;
+      StateState = false;
+    }
     speed = speedrn;
+    stop();
   }
 
 
