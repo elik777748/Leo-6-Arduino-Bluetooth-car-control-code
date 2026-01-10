@@ -44,9 +44,11 @@ unsigned long avariaTimer = 0;
 bool saveWallState;
 bool sonareState;
 bool AlgoritmBlackLineState;
+bool AlgoritmBlackLineStateFalse = false;
 bool saveWall = false;
 bool avariaState = false;
 bool avaria;
+bool avariaStateFalse = false;
 unsigned int color = 0;
 const unsigned long avariaInterval = 1000;
 bool six_seven = false;
@@ -307,6 +309,7 @@ void loop() {
   }
 
   if (AlgoritmBlackLine) {
+    AlgoritmBlackLineStateFalse = true;
     speed = 80;
     if (distance < 30 && distance != 0 && !isBacking) {
       isBacking = true;
@@ -338,13 +341,12 @@ void loop() {
     }
     delay(100);
   } else {
-    speed = speedrn;
-    stop();
+    if (AlgoritmBlackLineStateFalse) {
+      AlgoritmBlackLineStateFalse = false;
+      speed = speedrn;
+      stop();
+    }
   }
-if (drawToLSD){
-
-
-}
 
   if (sonare) {
     if (distance <= 200 && distance > 60) {
@@ -464,6 +466,7 @@ if (drawToLSD){
   }
   if (avaria) {
     if (!StateState) {
+      avariaStateFalse = true;
       StateState = true;
       sonareState = sonare;
       AlgoritmBlackLineState = AlgoritmBlackLine;
@@ -514,8 +517,11 @@ if (drawToLSD){
       saveWall = saveWallState;
       StateState = false;
     }
-    speed = speedrn;
-    stop();
+    if (avariaStateFalse) {
+      avariaStateFalse = false;
+      speed = speedrn;
+      stop();
+    }
   }
 
 
